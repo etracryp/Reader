@@ -1,0 +1,8 @@
+websockets
+aiohttp
+python-dotenv
+asyncio
+json
+hashlib
+hmac
+time 
