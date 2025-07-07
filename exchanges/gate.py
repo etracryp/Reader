@@ -7,6 +7,7 @@ import websockets
 from typing import Dict, List, Optional, Callable
 import os
 from dotenv import load_dotenv
+import aiohttp
 
 load_dotenv()
 
@@ -207,6 +208,28 @@ class GateIOWebSocket:
         except Exception as e:
             print(f"Error in Gate.io listen loop: {e}")
             self.is_connected = False
+
+async def get_fees():
+    """Fetch spot trading fees from Gate.io REST API (requires API key/secret in env)."""
+    api_key = os.getenv('GATEIO_API_KEY')
+    api_secret = os.getenv('GATEIO_API_SECRET')
+    if not api_key or not api_secret:
+        return {'error': 'Missing Gate.io API key or secret'}
+    url = 'https://api.gateio.ws/api/v4/spot/accounts/fee'
+    headers = {
+        'Content-Type': 'application/json',
+        'KEY': api_key,
+        'Timestamp': str(int(time.time())),
+    }
+    sign_str = 'GET\n/api/v4/spot/accounts/fee\n\n' + headers['Timestamp']
+    signature = hmac.new(api_secret.encode(), sign_str.encode(), hashlib.sha512).hexdigest()
+    headers['SIGN'] = signature
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as resp:
+            if resp.status == 200:
+                return await resp.json()
+            else:
+                return {'error': f'HTTP {resp.status}'}
 
 # Example usage
 async def main():

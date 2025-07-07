@@ -9,6 +9,7 @@ import websockets
 from typing import Dict, List, Optional, Callable
 import os
 from dotenv import load_dotenv
+import aiohttp
 
 load_dotenv()
 
@@ -184,6 +185,21 @@ async def main():
     await cex.authenticate()
     await cex.subscribe_to_ticker(['BTC:USD', 'ETH:USD'])
     await cex.listen()
+
+async def get_fees():
+    """Fetch spot trading fees from CEX.IO REST API (requires API key/secret in env)."""
+    api_key = os.getenv('CEXIO_API_KEY')
+    api_secret = os.getenv('CEXIO_API_SECRET')
+    if not api_key or not api_secret:
+        return {'error': 'Missing CEX.IO API key or secret'}
+    url = 'https://cex.io/api/fees'
+    headers = {'Content-Type': 'application/json'}
+    async with aiohttp.ClientSession() as session:
+        async with session.get(url, headers=headers) as resp:
+            if resp.status == 200:
+                return await resp.json()
+            else:
+                return {'error': f'HTTP {resp.status}'}
 
 if __name__ == "__main__":
     asyncio.run(main()) 

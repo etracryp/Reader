@@ -7,6 +7,7 @@ import websockets
 from typing import Dict, List, Optional, Callable
 import os
 from dotenv import load_dotenv
+import aiohttp
 
 load_dotenv()
 
@@ -242,6 +243,25 @@ class BinanceWebSocket:
         except Exception as e:
             print(f"Error in Binance listen loop: {e}")
             self.is_connected = False
+
+async def get_fees():
+    """Fetch spot trading fees from Binance REST API (requires API key/secret in env)."""
+    api_key = os.getenv('BINANCE_API_KEY')
+    api_secret = os.getenv('BINANCE_API_SECRET')
+    if not api_key or not api_secret:
+        return {'error': 'Missing Binance API key or secret'}
+    url = 'https://api.binance.com/sapi/v1/asset/tradeFee'
+    timestamp = int(time.time() * 1000)
+    query = f'timestamp={timestamp}'
+    signature = hmac.new(api_secret.encode(), query.encode(), hashlib.sha256).hexdigest()
+    full_url = f'{url}?{query}&signature={signature}'
+    headers = {'X-MBX-APIKEY': api_key}
+    async with aiohttp.ClientSession() as session:
+        async with session.get(full_url, headers=headers) as resp:
+            if resp.status == 200:
+                return await resp.json()
+            else:
+                return {'error': f'HTTP {resp.status}'}
 
 # Example usage
 async def main():
