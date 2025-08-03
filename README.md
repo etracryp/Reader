@@ -13,6 +13,158 @@ This arbitrage trading system monitors price differences across multiple cryptoc
 - **Safety Mechanisms**: Built-in safeguards to prevent system overuse
 - **Order Confirmation**: Waits for sell confirmation before executing new buy orders
 - **Risk Management**: Configurable limits and thresholds
+- **Web UI**: Real-time monitoring interface with exchange status and price comparison
+
+## Quick Start
+
+### 1. Automatic Environment Setup
+
+The easiest way to get started is to use the automatic environment setup script:
+
+```bash
+# Run the environment setup script
+python scripts/setup_env.py
+```
+
+This will create a complete `.env` file with all required environment variables. You'll just need to:
+
+1. **Edit the `.env` file** and replace the placeholder values with your actual API keys
+2. **Install dependencies**: `pip install -r requirements.txt`
+3. **Start the system**: `python main.py`
+4. **Start the web UI**: `python ui/app.py`
+
+### 2. Manual Setup (Alternative)
+
+If you prefer to set up manually:
+
+```bash
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file manually
+cp .env.example .env  # (if .env.example exists)
+# Then edit .env with your API keys
+```
+
+## Web UI
+
+The system includes a web-based user interface for real-time monitoring:
+
+### Features
+- **Exchange Status Monitoring**: Real-time connection status for all exchanges
+- **Price Comparison**: Side-by-side price display with BUY/SELL indicators
+- **Arbitrage Opportunities**: Live detection and display of profitable opportunities
+- **Profit Calculation**: Automatic profit percentage calculation
+
+### How to Run the UI
+
+1. **Install UI Dependencies**:
+   ```bash
+   pip install flask flask-socketio
+   ```
+
+2. **Start the Web Interface**:
+   ```bash
+   python ui/app.py
+   ```
+
+3. **Access the UI**:
+   Open your browser and navigate to `http://localhost:5000`
+
+### UI Components
+
+#### Exchange Status Cards
+- **Green Indicator**: Exchange is connected and receiving data
+- **Red Indicator**: Exchange is disconnected or not responding
+- **Last Update Time**: Shows when the exchange last sent price data
+
+#### Price Comparison Grid
+- **Symbol Cards**: Each trading pair gets its own card
+- **Buy Price (Green)**: Lowest price across all exchanges (best to buy)
+- **Sell Price (Red)**: Highest price across all exchanges (best to sell)
+- **Potential Profit**: Calculated profit percentage if you buy low and sell high
+
+#### Arbitrage Opportunities
+- **High Profit (Green)**: Opportunities with >1% profit
+- **Medium Profit (Orange)**: Opportunities with 0.5-1% profit
+- **Low Profit (Red)**: Opportunities with <0.5% profit
+
+### UI Instructions
+
+1. **Monitor Exchange Status**: Check the status cards to ensure all exchanges are connected (green indicators)
+
+2. **Analyze Price Differences**: 
+   - Look for symbols with large price differences between exchanges
+   - Green prices indicate the best buying opportunities
+   - Red prices indicate the best selling opportunities
+
+3. **Track Arbitrage Opportunities**:
+   - The system automatically detects and displays profitable opportunities
+   - Opportunities are color-coded by profit potential
+   - Each opportunity shows the buy/sell exchanges and expected profit
+
+4. **Real-time Updates**:
+   - All data updates automatically via WebSocket
+   - No need to refresh the page
+   - Last update time is shown at the bottom
+
+## Environment Variables
+
+The system uses a comprehensive set of environment variables. The setup script creates a complete `.env` file with all required variables:
+
+### Exchange API Credentials
+```bash
+# CEX.IO
+CEXIO_API_KEY=your_cexio_api_key_here
+CEXIO_API_SECRET=your_cexio_api_secret_here
+
+# Gate.io
+GATEIO_API_KEY=your_gateio_api_key_here
+GATEIO_API_SECRET=your_gateio_api_secret_here
+
+# Binance
+BINANCE_API_KEY=your_binance_api_key_here
+BINANCE_API_SECRET=your_binance_api_secret_here
+```
+
+### Safety Settings
+```bash
+MIN_PROFIT_THRESHOLD=0.005  # 0.5%
+MAX_DAILY_TRADES=50
+MAX_POSITION_SIZE=1000      # USDT
+TRADE_COOLDOWN=30           # seconds
+```
+
+### Web UI Settings
+```bash
+FLASK_SECRET_KEY=your-secret-key-change-this-in-production
+FLASK_DEBUG=True
+FLASK_HOST=0.0.0.0
+FLASK_PORT=5000
+```
+
+### Trading Configuration
+```bash
+MIN_TRADE_SIZE=10
+RECONNECT_DELAY=5000
+MAX_RECONNECT_ATTEMPTS=10
+ORDER_TIMEOUT=30
+```
+
+### Advanced Settings
+```bash
+# Enable/disable specific exchanges
+ENABLE_CEX=True
+ENABLE_GATE=True
+ENABLE_BINANCE=True
+
+# Trading pairs to monitor
+TRADING_PAIRS=BTCUSDT,ETHUSDT,BNBUSDT,ADAUSDT,DOTUSDT,LINKUSDT,LTCUSDT,BCHUSDT
+
+# Development settings
+DEBUG_MODE=True
+TEST_MODE=False
+```
 
 ## Supported Exchanges
 
@@ -80,6 +232,11 @@ This arbitrage trading system monitors price differences across multiple cryptoc
    - Trading frequency controls
    - Emergency stop mechanisms
 
+5. **Web UI**
+   - Real-time status monitoring
+   - Price comparison interface
+   - Arbitrage opportunity display
+
 ### WebSocket Endpoints
 
 ```python
@@ -144,25 +301,30 @@ EXCHANGE_FEES = {
 - API keys for all three exchanges
 - Sufficient balance on all exchanges
 
-### Environment Variables
+### Quick Installation
 ```bash
-# CEX.IO
-CEXIO_API_KEY=your_cexio_api_key
-CEXIO_API_SECRET=your_cexio_secret
+# 1. Clone the repository
+git clone <repository-url>
+cd Reader
 
-# Gate.io
-GATEIO_API_KEY=your_gateio_api_key
-GATEIO_API_SECRET=your_gateio_secret
+# 2. Create virtual environment
+python3 -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
 
-# Binance
-BINANCE_API_KEY=your_binance_api_key
-BINANCE_API_SECRET=your_binance_secret
+# 3. Install dependencies
+pip install -r requirements.txt
 
-# Safety Settings
-MIN_PROFIT_THRESHOLD=0.005  # 0.5%
-MAX_DAILY_TRADES=50
-MAX_POSITION_SIZE=1000      # USDT
-TRADE_COOLDOWN=30           # seconds
+# 4. Set up environment (creates .env file)
+python scripts/setup_env.py
+
+# 5. Edit .env file with your API keys
+# Edit the .env file and replace placeholder values
+
+# 6. Start the system
+python main.py
+
+# 7. Start the web UI (in another terminal)
+python ui/app.py
 ```
 
 ### Dependencies
@@ -175,6 +337,8 @@ pip install json
 pip install hashlib
 pip install hmac
 pip install time
+pip install flask
+pip install flask-socketio
 ```
 
 ## Configuration
@@ -225,6 +389,12 @@ TRADING_PAIRS = [
 3. Start the arbitrage monitoring system
 4. Monitor logs and trading activities
 5. Regularly review performance and adjust parameters
+
+### Web UI Operation
+1. Start the web interface: `python ui/app.py`
+2. Open browser to `http://localhost:5000`
+3. Monitor exchange status and price differences
+4. Watch for arbitrage opportunities in real-time
 
 ### Monitoring and Logging
 - Real-time price differences

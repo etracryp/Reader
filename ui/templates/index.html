@@ -1,0 +1,722 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Arbitrage Trading System</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.0.1/socket.io.js"></script>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            max-width: 1200px;
+            margin: 0 auto;
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .exchange-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .exchange-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        .status-indicator {
+            display: inline-block;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            margin-right: 10px;
+        }
+        .status-connected { background: #4CAF50; }
+        .status-disconnected { background: #f44336; }
+        .price-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+            gap: 20px;
+        }
+        .price-card {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .symbol-name {
+            font-size: 1.3em;
+            font-weight: bold;
+            margin-bottom: 15px;
+            color: #333;
+        }
+        .price-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px;
+            border-bottom: 1px solid #eee;
+            background: #f9f9f9;
+            margin: 4px 0;
+            border-radius: 6px;
+        }
+        .price-row:last-child {
+            border-bottom: none;
+        }
+        
+        .exchange-name {
+            font-weight: bold;
+            color: #333;
+            min-width: 80px;
+        }
+        
+        .price-details {
+            flex: 1;
+            display: flex;
+            gap: 15px;
+            margin: 0 15px;
+        }
+        
+        .price-row-item {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            min-width: 80px;
+        }
+        
+        .label {
+            font-size: 0.8em;
+            color: #666;
+            margin-bottom: 2px;
+        }
+        
+        .price-value, .bid-price, .ask-price {
+            font-weight: bold;
+            font-size: 1.1em;
+        }
+        
+        .bid-price {
+            color: #4CAF50;
+        }
+        
+        .ask-price {
+            color: #f44336;
+        }
+        
+        .timestamp {
+            font-size: 0.7em;
+            color: #999;
+            min-width: 60px;
+            text-align: right;
+        }
+        .exchange-price {
+            font-weight: 500;
+        }
+        .buy-price {
+            color: #4CAF50;
+            font-weight: bold;
+        }
+        .sell-price {
+            color: #f44336;
+            font-weight: bold;
+        }
+        .opportunities {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            margin-top: 20px;
+        }
+        .opportunity-item {
+            background: #e8f5e8;
+            border-left: 4px solid #4CAF50;
+            padding: 15px;
+            margin: 10px 0;
+            border-radius: 5px;
+        }
+        .profit-high {
+            background: #e8f5e8;
+            border-left-color: #4CAF50;
+        }
+        .profit-medium {
+            background: #fff3e0;
+            border-left-color: #ff9800;
+        }
+        .profit-low {
+            background: #ffebee;
+            border-left-color: #f44336;
+        }
+        .refresh-time {
+            text-align: center;
+            color: #666;
+            font-size: 0.9em;
+            margin-top: 10px;
+        }
+        .debug-info {
+            background: #f0f0f0;
+            padding: 10px;
+            border-radius: 5px;
+            margin: 10px 0;
+            font-family: monospace;
+            font-size: 0.8em;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🚀 Arbitrage Trading System</h1>
+            <p>Real-time exchange monitoring and price comparison</p>
+        </div>
+
+        <div class="status-grid">
+            <div class="exchange-card">
+                <div class="exchange-name">
+                    <span id="cex-status" class="status-indicator status-disconnected"></span>
+                    CEX.IO
+                </div>
+                <div id="cex-details">Connecting...</div>
+            </div>
+            <div class="exchange-card">
+                <div class="exchange-name">
+                    <span id="gate-status" class="status-indicator status-disconnected"></span>
+                    Gate.io
+                </div>
+                <div id="gate-details">Connecting...</div>
+            </div>
+            <div class="exchange-card">
+                <div class="exchange-name">
+                    <span id="binance-status" class="status-indicator status-disconnected"></span>
+                    Binance
+                </div>
+                <div id="binance-details">Connecting...</div>
+            </div>
+        </div>
+
+        <div class="price-grid" id="price-grid">
+            <!-- Price cards will be dynamically added here -->
+        </div>
+
+        <div class="opportunities">
+            <h2>🎯 Arbitrage Opportunities</h2>
+            <div id="opportunities-list">
+                <p>Waiting for opportunities...</p>
+            </div>
+        </div>
+
+        <div class="refresh-time" id="last-update">
+            Last update: Never
+            <span id="live-indicator" style="margin-left: 10px; font-weight: bold;">⚪ LIVE</span>
+            <button onclick="window.location.reload()" style="margin-left: 10px; padding: 5px 10px; background: #4CAF50; color: white; border: none; border-radius: 3px; cursor: pointer;">🔄 Refresh</button>
+        </div>
+        
+        <div class="debug-info" id="debug-info">
+            Debug: Waiting for price updates...
+        </div>
+        
+        <div class="test-controls" style="margin-top: 10px; text-align: center;">
+            <button onclick="testWebSocketData()" style="margin: 5px; padding: 8px 15px; background: #2196F3; color: white; border: none; border-radius: 4px; cursor: pointer;">🧪 Test WebSocket Data</button>
+            <button onclick="testDataStructure()" style="margin: 5px; padding: 8px 15px; background: #FF9800; color: white; border: none; border-radius: 4px; cursor: pointer;">🔍 Test Data Structure</button>
+            <button onclick="forceUpdateDisplay()" style="margin: 5px; padding: 8px 15px; background: #9C27B0; color: white; border: none; border-radius: 4px; cursor: pointer;">🔄 Force Update Display</button>
+            <button onclick="simulateRealTimeUpdates()" style="margin: 5px; padding: 8px 15px; background: #E91E63; color: white; border: none; border-radius: 4px; cursor: pointer;">🎬 Start Real-time Simulation</button>
+        </div>
+    </div>
+
+    <script>
+        const socket = io();
+        
+        // Initialize price data structure
+        let priceData = {};
+        let opportunities = [];
+        
+        // Add initial test data to ensure price grid is displayed
+        priceData['BTCUSDT'] = {
+            'gate': {
+                price: 114447.8,
+                last: 114447.8,
+                highest_bid: 114447.7,
+                lowest_ask: 114447.8,
+                timestamp: Date.now() / 1000
+            }
+        };
+        priceData['ETHUSDT'] = {
+            'gate': {
+                price: 3501.3,
+                last: 3501.3,
+                highest_bid: 3501.42,
+                lowest_ask: 3501.43,
+                timestamp: Date.now() / 1000
+            }
+        };
+        
+        // Initialize the display with test data
+        setTimeout(() => {
+            updatePriceDisplay(priceData);
+        }, 1000);
+        
+        socket.on('connect', function() {
+            console.log('Connected to server');
+            document.getElementById('debug-info').textContent = 'Debug: Connected to server';
+            lastUpdateTime = Date.now();
+        });
+        
+        socket.on('disconnect', function() {
+            console.log('Disconnected from server');
+            document.getElementById('debug-info').textContent = 'Debug: Disconnected from server - reconnecting...';
+        });
+        
+        socket.on('reconnect', function() {
+            console.log('Reconnected to server');
+            document.getElementById('debug-info').textContent = 'Debug: Reconnected to server';
+            lastUpdateTime = Date.now();
+        });
+        
+        socket.on('status_update', function(data) {
+            updateExchangeStatus(data.exchanges);
+            updatePriceDisplay(data.price_data);
+            updateOpportunities(data.opportunities);
+        });
+        
+        socket.on('price_update', function(data) {
+            console.log('Price update received:', data);
+            lastUpdateTime = Date.now();
+            
+            // Process the price update data
+            if (data && data.exchange && data.symbol && data.data) {
+                updatePriceData(data.exchange, data.symbol, data.data);
+                updatePriceDisplay(priceData); // Force immediate display update
+                updateLastUpdate();
+                
+                // Add visual feedback for price updates
+                const debugInfo = document.getElementById('debug-info');
+                debugInfo.innerHTML = `🔄 LIVE UPDATE - ${data.exchange} ${data.symbol}<br>💰 Price: $${data.data.price}<br>📈 Bid: $${data.data.highest_bid}<br>📉 Ask: $${data.data.lowest_ask}<br>⏰ Time: ${new Date().toLocaleTimeString()}`;
+                debugInfo.style.backgroundColor = '#4CAF50';
+                debugInfo.style.color = 'white';
+                setTimeout(() => {
+                    debugInfo.style.backgroundColor = '#f0f0f0';
+                    debugInfo.style.color = 'black';
+                }, 2000);
+                
+                // Flash the updated price card with animation
+                const symbol = data.symbol;
+                const cards = document.querySelectorAll('.price-card');
+                cards.forEach(card => {
+                    if (card.querySelector('.symbol-name').textContent === symbol) {
+                        card.style.backgroundColor = '#4CAF50';
+                        card.style.color = 'white';
+                        card.style.transform = 'scale(1.02)';
+                        setTimeout(() => {
+                            card.style.backgroundColor = 'white';
+                            card.style.color = 'black';
+                            card.style.transform = 'scale(1)';
+                        }, 1000);
+                    }
+                });
+                
+                // Add a live indicator
+                const liveIndicator = document.getElementById('live-indicator');
+                if (liveIndicator) {
+                    liveIndicator.textContent = '🟢 LIVE';
+                    liveIndicator.style.color = '#4CAF50';
+                    setTimeout(() => {
+                        liveIndicator.textContent = '⚪ LIVE';
+                        liveIndicator.style.color = '#666';
+                    }, 1000);
+                }
+            } else {
+                console.error('Invalid price update data:', data);
+            }
+        });
+        
+        socket.on('opportunity_update', function(data) {
+            updateOpportunities(data.opportunities);
+        });
+        
+        function updateExchangeStatus(exchanges) {
+            Object.keys(exchanges).forEach(exchange => {
+                const status = exchanges[exchange];
+                const statusElement = document.getElementById(`${exchange}-status`);
+                const detailsElement = document.getElementById(`${exchange}-details`);
+                
+                if (status.connected) {
+                    statusElement.className = 'status-indicator status-connected';
+                    const lastUpdate = status.last_update ? new Date(status.last_update * 1000).toLocaleTimeString() : 'Unknown';
+                    detailsElement.innerHTML = `Connected<br>Last update: ${lastUpdate}`;
+                } else {
+                    statusElement.className = 'status-indicator status-disconnected';
+                    detailsElement.innerHTML = 'Disconnected';
+                }
+            });
+        }
+        
+        function updatePriceData(exchange, symbol, data) {
+            if (!priceData[symbol]) {
+                priceData[symbol] = {};
+            }
+            
+            // Get the current price for comparison
+            const currentPrice = priceData[symbol][exchange]?.price || priceData[symbol][exchange]?.last || 0;
+            const newPrice = parseFloat(data.price || data.last || data.c || 0);
+            
+            // Ensure we have the correct data structure with proper bid/ask parsing
+            const processedData = {
+                ...data,
+                price: newPrice,
+                last: newPrice,
+                highest_bid: parseFloat(data.highest_bid || data.bid || 0),
+                lowest_ask: parseFloat(data.lowest_ask || data.ask || 0),
+                timestamp: Date.now() / 1000
+            };
+            
+            // Debug the processed data
+            console.log('Processed data for', exchange, symbol, ':', processedData);
+            
+            priceData[symbol][exchange] = processedData;
+            updatePriceDisplay(priceData);
+            
+            // Add visual feedback for price changes
+            if (currentPrice > 0 && newPrice > 0) {
+                const priceChange = newPrice - currentPrice;
+                const priceElement = document.querySelector(`[data-exchange="${exchange}"][data-symbol="${symbol}"] .price-value`);
+                if (priceElement) {
+                    priceElement.style.color = priceChange > 0 ? '#4CAF50' : priceChange < 0 ? '#f44336' : '#333';
+                    setTimeout(() => {
+                        priceElement.style.color = '#333';
+                    }, 1000);
+                }
+            }
+        }
+        
+        function updatePriceDisplay(priceData) {
+            const priceGrid = document.getElementById('price-grid');
+            priceGrid.innerHTML = '';
+            
+            // Debug: Show raw data structure
+            console.log('Updating price display with data:', priceData);
+            
+            Object.keys(priceData).forEach(symbol => {
+                const exchanges = priceData[symbol];
+                if (Object.keys(exchanges).length === 0) return;
+                
+                // Find best buy and sell prices
+                let bestBuy = { exchange: null, price: Infinity };
+                let bestSell = { exchange: null, price: 0 };
+                
+                Object.keys(exchanges).forEach(exchange => {
+                    const price = parseFloat(exchanges[exchange].price || exchanges[exchange].last || exchanges[exchange].c || 0);
+                    if (price > 0) {
+                        if (price < bestBuy.price) {
+                            bestBuy = { exchange, price };
+                        }
+                        if (price > bestSell.price) {
+                            bestSell = { exchange, price };
+                        }
+                    }
+                });
+                
+                const card = document.createElement('div');
+                card.className = 'price-card';
+                
+                let cardHTML = `<div class="symbol-name">${symbol}</div>`;
+                
+                Object.keys(exchanges).forEach(exchange => {
+                    const data = exchanges[exchange];
+                    const lastPrice = parseFloat(data.price || data.last || data.c || 0);
+                    const bidPrice = parseFloat(data.highest_bid || data.bid || 0);
+                    const askPrice = parseFloat(data.lowest_ask || data.ask || 0);
+                    
+                    // Additional debug logging
+                    console.log('Raw data from WebSocket:', data);
+                    console.log('Parsed values:', { lastPrice, bidPrice, askPrice });
+                    
+                    // Debug logging
+                    console.log('Price data for', exchange, symbol, ':', {
+                        lastPrice,
+                        bidPrice,
+                        askPrice,
+                        rawData: data
+                    });
+                    
+                    // Determine best prices for highlighting
+                    const priceClass = exchange === bestBuy.exchange ? 'buy-price' : 
+                                     exchange === bestSell.exchange ? 'sell-price' : 'exchange-price';
+                    
+                    // Add timestamp for freshness
+                    const timestamp = data.timestamp ? new Date(data.timestamp * 1000).toLocaleTimeString() : 'Now';
+                    
+                    cardHTML += `
+                        <div class="price-row" data-exchange="${exchange}" data-symbol="${symbol}">
+                            <div class="exchange-name">${exchange.toUpperCase()}</div>
+                            <div class="price-details">
+                                <div class="price-row-item">
+                                    <span class="label">Last:</span>
+                                    <span class="price-value ${priceClass}">$${lastPrice.toFixed(2)}</span>
+                                </div>
+                                <div class="price-row-item">
+                                    <span class="label">Bid:</span>
+                                    <span class="bid-price">$${bidPrice.toFixed(2)}</span>
+                                </div>
+                                <div class="price-row-item">
+                                    <span class="label">Ask:</span>
+                                    <span class="ask-price">$${askPrice.toFixed(2)}</span>
+                                </div>
+                            </div>
+                            <div class="timestamp">${timestamp}</div>
+                        </div>
+                    `;
+                });
+                
+                if (bestBuy.exchange && bestSell.exchange && bestBuy.exchange !== bestSell.exchange) {
+                    const profitPct = ((bestSell.price - bestBuy.price) / bestBuy.price * 100).toFixed(2);
+                    cardHTML += `
+                        <div class="price-row" style="margin-top: 10px; padding-top: 10px; border-top: 2px solid #eee;">
+                            <span><strong>Potential Profit:</strong></span>
+                            <span style="color: #4CAF50; font-weight: bold;">${profitPct}%</span>
+                        </div>
+                    `;
+                }
+                
+                card.innerHTML = cardHTML;
+                priceGrid.appendChild(card);
+            });
+        }
+        
+        function updateOpportunities(opps) {
+            opportunities = opps;
+            const container = document.getElementById('opportunities-list');
+            
+            if (opportunities.length === 0) {
+                container.innerHTML = '<p>No arbitrage opportunities found...</p>';
+                return;
+            }
+            
+            container.innerHTML = opportunities.map(opp => {
+                const profitClass = opp.profit_pct > 1 ? 'profit-high' : 
+                                  opp.profit_pct > 0.5 ? 'profit-medium' : 'profit-low';
+                
+                return `
+                    <div class="opportunity-item ${profitClass}">
+                        <strong>${opp.symbol}</strong><br>
+                        Buy: ${opp.buy_exchange.toUpperCase()} @ $${opp.buy_price.toFixed(2)}<br>
+                        Sell: ${opp.sell_exchange.toUpperCase()} @ $${opp.sell_price.toFixed(2)}<br>
+                        Profit: <strong>${(opp.profit_pct * 100).toFixed(2)}%</strong>
+                    </div>
+                `;
+            }).join('');
+        }
+        
+        function updateLastUpdate() {
+            document.getElementById('last-update').textContent = 
+                `Last update: ${new Date().toLocaleTimeString()}`;
+        }
+        
+        // Update every 5 seconds
+        setInterval(updateLastUpdate, 5000);
+        
+        // Auto-refresh price numbers every 1 second without page reload
+        let lastUpdateTime = Date.now();
+        const REFRESH_TIMEOUT = 1000; // 1 second
+        
+        // Force update every second to ensure real-time display
+        setInterval(() => {
+            console.log('Forcing price update for real-time display...');
+            updatePriceDisplay(priceData);
+            updateLastUpdate();
+            
+            // Add visual indicator for live updates
+            const liveIndicator = document.getElementById('live-indicator');
+            if (liveIndicator) {
+                liveIndicator.textContent = '🟢 LIVE';
+                liveIndicator.style.color = '#4CAF50';
+                setTimeout(() => {
+                    liveIndicator.textContent = '⚪ LIVE';
+                    liveIndicator.style.color = '#666';
+                }, 500);
+            }
+        }, 1000); // Update every 1 second
+        
+        // Function to refresh only price numbers
+        function refreshPriceNumbers() {
+            // This function will be called when WebSocket updates are received
+            // The actual price updates come from the WebSocket data
+            console.log('Price numbers refreshed via WebSocket');
+            updateLastUpdate();
+        }
+        
+        // Update last update time when we receive any WebSocket message
+        socket.on('connect', function() {
+            lastUpdateTime = Date.now();
+        });
+        
+        socket.on('price_update', function(data) {
+            console.log('Received price update:', data);
+            lastUpdateTime = Date.now();
+            
+            // Process the price update data
+            if (data && data.exchange && data.symbol && data.data) {
+                updatePriceData(data.exchange, data.symbol, data.data);
+                updatePriceDisplay(priceData); // Force immediate display update
+                
+                // Add visual feedback
+                const debugInfo = document.getElementById('debug-info');
+                if (debugInfo) {
+                    debugInfo.style.backgroundColor = '#4CAF50';
+                    setTimeout(() => {
+                        debugInfo.style.backgroundColor = '#f0f0f0';
+                    }, 500);
+                    
+                    // Update debug info with latest data
+                    debugInfo.innerHTML = `Last update: ${new Date().toLocaleTimeString()}<br>Exchange: ${data.exchange}<br>Symbol: ${data.symbol}<br>Price: $${data.data.price}<br>Bid: $${data.data.highest_bid}<br>Ask: $${data.data.lowest_ask}`;
+                }
+                
+                // Update live indicator
+                const liveIndicator = document.getElementById('live-indicator');
+                if (liveIndicator) {
+                    liveIndicator.textContent = '🟢 LIVE';
+                    liveIndicator.style.color = '#4CAF50';
+                    setTimeout(() => {
+                        liveIndicator.textContent = '⚪ LIVE';
+                        liveIndicator.style.color = '#666';
+                    }, 2000);
+                }
+                
+                // Flash the updated price card
+                const symbol = data.symbol;
+                const cards = document.querySelectorAll('.price-card');
+                cards.forEach(card => {
+                    if (card.textContent.includes(symbol)) {
+                        card.style.transform = 'scale(1.05)';
+                        card.style.backgroundColor = '#e8f5e8';
+                        setTimeout(() => {
+                            card.style.transform = 'scale(1)';
+                            card.style.backgroundColor = '#fff';
+                        }, 500);
+                    }
+                });
+            } else {
+                console.error('Invalid price update data:', data);
+            }
+        });
+        
+        socket.on('status_update', function(data) {
+            lastUpdateTime = Date.now();
+        });
+        
+        // Test data structure
+        function testDataStructure() {
+            const testData = {
+                'currency_pair': 'BTC_USDT',
+                'last': '114451.9',
+                'lowest_ask': '114451.9',
+                'highest_bid': '114451.8'
+            };
+            console.log('Testing data structure:', testData);
+            console.log('Parsed bid:', parseFloat(testData.highest_bid || 0));
+            console.log('Parsed ask:', parseFloat(testData.lowest_ask || 0));
+        }
+        
+        // Test WebSocket data flow
+        function testWebSocketData() {
+            const testData = {
+                exchange: 'gate',
+                symbol: 'BTCUSDT',
+                data: {
+                    price: 114451.9,
+                    highest_bid: 114451.8,
+                    lowest_ask: 114451.9,
+                    timestamp: Date.now() / 1000
+                }
+            };
+            console.log('Simulating WebSocket data:', testData);
+            updatePriceData(testData.exchange, testData.symbol, testData.data);
+            updatePriceDisplay(priceData);
+            
+            // Add visual feedback
+            const debugInfo = document.getElementById('debug-info');
+            if (debugInfo) {
+                debugInfo.innerHTML = `Test data - ${new Date().toLocaleTimeString()}<br>Exchange: ${testData.exchange}<br>Symbol: ${testData.symbol}<br>Price: $${testData.data.price}<br>Bid: $${testData.data.highest_bid}<br>Ask: $${testData.data.lowest_ask}`;
+                debugInfo.style.backgroundColor = '#FF9800';
+                setTimeout(() => {
+                    debugInfo.style.backgroundColor = '#f0f0f0';
+                }, 2000);
+            }
+        }
+        
+        // Force update price display
+        function forceUpdateDisplay() {
+            console.log('Forcing price display update...');
+            updatePriceDisplay(priceData);
+            const debugInfo = document.getElementById('debug-info');
+            if (debugInfo) {
+                debugInfo.innerHTML = `Forced update - ${new Date().toLocaleTimeString()}<br>Data keys: ${Object.keys(priceData).join(', ')}`;
+                debugInfo.style.backgroundColor = '#2196F3';
+                setTimeout(() => {
+                    debugInfo.style.backgroundColor = '#f0f0f0';
+                }, 2000);
+            }
+        }
+        
+        // Simulate real-time updates for testing
+        function simulateRealTimeUpdates() {
+            setInterval(() => {
+                // Simulate price changes
+                if (priceData['BTCUSDT'] && priceData['BTCUSDT']['gate']) {
+                    const currentPrice = priceData['BTCUSDT']['gate'].price;
+                    const change = (Math.random() - 0.5) * 10; // Random change between -5 and +5
+                    priceData['BTCUSDT']['gate'].price = currentPrice + change;
+                    priceData['BTCUSDT']['gate'].highest_bid = currentPrice + change - 0.1;
+                    priceData['BTCUSDT']['gate'].lowest_ask = currentPrice + change + 0.1;
+                    priceData['BTCUSDT']['gate'].timestamp = Date.now() / 1000;
+                }
+                
+                if (priceData['ETHUSDT'] && priceData['ETHUSDT']['gate']) {
+                    const currentPrice = priceData['ETHUSDT']['gate'].price;
+                    const change = (Math.random() - 0.5) * 2; // Random change between -1 and +1
+                    priceData['ETHUSDT']['gate'].price = currentPrice + change;
+                    priceData['ETHUSDT']['gate'].highest_bid = currentPrice + change - 0.01;
+                    priceData['ETHUSDT']['gate'].lowest_ask = currentPrice + change + 0.01;
+                    priceData['ETHUSDT']['gate'].timestamp = Date.now() / 1000;
+                }
+                
+                updatePriceDisplay(priceData);
+                updateLastUpdate();
+                
+                console.log('Simulated real-time update');
+            }, 2000); // Update every 2 seconds
+        }
+        
+        // Add a function to manually test the data
+        function testWebSocketData() {
+            const testData = {
+                'exchange': 'gate',
+                'symbol': 'BTCUSDT',
+                'data': {
+                    'price': 114421.7,
+                    'highest_bid': 114421.6,
+                    'lowest_ask': 114421.7,
+                    'timestamp': Date.now() / 1000
+                }
+            };
+            console.log('Testing WebSocket data simulation:', testData);
+            updatePriceData(testData.exchange, testData.symbol, testData.data);
+        }
+        
+        // Run test on page load
+        testDataStructure();
+    </script>
+</body>
+</html> 

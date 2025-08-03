@@ -15,19 +15,38 @@ class PriceMonitor:
         }
 
     def register_callback(self, callback: Callable[[str, str, Dict[str, Any]], None]):
+        """Register a callback for price updates"""
         self.price_callback = callback
 
     async def start(self):
-        await self.ws_manager.connect_all()
-        await self.ws_manager.subscribe_to_tickers(self.pairs)
-        self.ws_manager.register_price_callback(self._on_price_update)
-        await self.ws_manager.start_listening()
+        """Start the price monitoring system"""
+        try:
+            print("🔌 Connecting to exchanges...")
+            await self.ws_manager.connect_all()
+            
+            print("📡 Subscribing to tickers...")
+            await self.ws_manager.subscribe_to_tickers(self.pairs)
+            
+            print("👂 Registering price callback...")
+            self.ws_manager.register_price_callback(self._on_price_update)
+            
+            print("🚀 Starting price monitoring...")
+            await self.ws_manager.start_listening()
+            
+        except Exception as e:
+            print(f"❌ Error starting price monitor: {e}")
+            raise
 
     async def _on_price_update(self, exchange, symbol, price_data):
-        if self.price_callback:
-            await self.price_callback(exchange, symbol, price_data)
-        else:
-            print(f'Price update: {exchange} {symbol} {price_data}')
+        """Handle price updates from exchanges"""
+        try:
+            if self.price_callback:
+                # Call the callback (it's now synchronous)
+                self.price_callback(exchange, symbol, price_data)
+            else:
+                print(f'Price update: {exchange} {symbol} {price_data}')
+        except Exception as e:
+            print(f"❌ Error in price callback: {e}")
 
 # Example usage
 async def print_price(exchange, symbol, price_data):
